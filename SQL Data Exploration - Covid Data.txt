@@ -1,0 +1,97 @@
+
+/*
+Covid 19 Data Exploration Portfolio Project
+
+Skills used: Joins, CTE's, Temp Tables, Windows Functions, Aggregate Functions, Creating Views, Converting Data Types
+
+*/
+
+-- Initial Data Exploration
+
+-- Selecting data to start with
+
+SELECT *
+FROM CovidDeaths
+WHERE continent IS NOT NULL
+ORDER BY 3, 4
+
+-- Selecting specific columns for analysis
+
+SELECT Location, date, total_cases, new_cases, total_deaths, population
+FROM CovidDeaths
+WHERE continent IS NOT NULL
+ORDER BY 1, 2
+
+-- Total Cases vs Total Deaths
+-- Shows the likelihood of dying if you contract Covid in your country
+
+SELECT Location, date, total_cases, total_deaths, (CAST(total_deaths AS DECIMAL) / CAST(total_cases AS DECIMAL)) AS DeathPercentage
+FROM CovidDeaths
+WHERE location = 'India' AND continent IS NOT NULL
+ORDER BY 1, 2
+
+-- Total Cases vs Population
+-- Shows the percentage of the population infected with Covid
+
+SELECT Location, date, Population, total_cases, (total_cases/population)*100 AS PercentPopulationInfected
+FROM CovidDeaths
+ORDER BY 1, 2
+
+-- Countries with the Highest Infection Rate compared to Population
+
+SELECT Location, Population, MAX(total_cases) AS HighestInfectionCount, Max((total_cases/population))*100 AS PercentPopulationInfected
+FROM CovidDeaths
+GROUP BY Location, Population
+ORDER BY PercentPopulationInfected DESC
+
+-- Countries with the Highest Death Count per Population
+
+SELECT Location, MAX(CAST(Total_deaths AS INT)) AS TotalDeathCount
+FROM CovidDeaths
+WHERE continent IS NOT NULL
+GROUP BY Location
+ORDER BY TotalDeathCount DESC
+
+-- BREAKING THINGS DOWN BY CONTINENT
+
+-- Showing continents with the highest death count per population
+
+SELECT continent, MAX(CAST(Total_deaths AS INT)) AS TotalDeathCount
+FROM CovidDeaths
+WHERE continent IS NOT NULL
+GROUP BY continent
+ORDER BY TotalDeathCount DESC
+
+-- GLOBAL NUMBERS
+
+SELECT SUM(new_cases) AS total_cases, SUM(CAST(new_deaths AS INT)) AS total_deaths, SUM(CAST(new_deaths AS INT))/SUM(New_Cases)*100 AS DeathPercentage
+FROM CovidDeaths
+WHERE continent IS NOT NULL
+ORDER BY 1, 2
+
+-- Total Population vs Vaccinations
+-- Shows the percentage of the population that has received at least one Covid vaccine
+
+SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations
+, SUM(CONVERT(BIGINT, vac.new_vaccinations)) OVER (PARTITION BY dea.Location ORDER BY dea.location, dea.Date) AS RollingPeopleVaccinated
+FROM CovidDeaths dea
+JOIN CovidVaccinations vac
+ON dea.location = vac.location
+AND dea.date = vac.date
+WHERE dea.continent IS NOT NULL
+ORDER BY 2, 3
+
+-- Using CTE to perform calculations on Partition By in the previous query
+
+WITH PopvsVac (Continent, Location, Date, Population, New_Vaccinations, RollingPeopleVaccinated)
+AS
+(
+SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations
+, SUM(CONVERT(BIGINT, vac.new_vaccinations)) OVER (PARTITION BY dea.Location ORDER BY dea.location, dea.Date) AS RollingPeopleVaccinated
+FROM CovidDeaths dea
+JOIN CovidVaccinations vac
+ON dea.location = vac.location
+AND dea.date = vac.date
+WHERE dea.continent IS NOT NULL
+)
+SELECT , (RollingPeopleVaccinated/Population)
